@@ -194,7 +194,7 @@ class OwnerClanClient:
     # Production: https://api.ownerclan.com/v1/graphql
     # Sandbox:    https://api-sandbox.ownerclan.com/v1/graphql
     GRAPHQL_URL = "https://api.ownerclan.com/v1/graphql"
-    AUTH_URL = "https://api.ownerclan.com/v1/auth"
+    AUTH_URL = "https://auth.ownerclan.com/auth"  # 공식 인증 엔드포인트
 
     def __init__(self):
         self.username = settings.ownerclan_username
@@ -204,10 +204,13 @@ class OwnerClanClient:
         self._token_expires_at: float = 0.0
 
     async def _authenticate(self) -> None:
-        """ID/PW로 JWT 토큰 발급"""
-        logger.info("[오너클랜] JWT 인증 요청")
+        """ID/PW로 JWT 토큰 발급 (공식 매뉴얼 기준)
         
-        # Try standard auth endpoint first, fall back to sandbox pattern
+        POST https://auth.ownerclan.com/auth
+        Body: { service, userType, username, password }
+        Response: JWT 토큰 문자열 (raw string)
+        """
+        logger.info("[오너클랜] JWT 인증 요청")
         auth_payload = {
             "service": "ownerclan",
             "userType": "seller",
@@ -215,61 +218,43 @@ class OwnerClanClient:
             "password": self.password,
         }
         
-        # GraphQL mutation for auth (some implementations use this)
-        auth_query = """
-        mutation Login($username: String!, $password: String!) {
-          login(username: $username, password: $password) {
-            token
-            expiresAt
-          }
-        }
-        """
-        
         async with httpx.AsyncClient(timeout=15.0) as client:
-            # First try REST auth endpoint
             try:
                 resp = await client.post(
                     self.AUTH_URL,
                     json=auth_payload,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    token = data.get("token") or data.get("access_token") or data.get("jwt")
-                    if token:
-                        self._jwt_token = token
-                        self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
-                        logger.info("[오너클랜] REST 인증 성공")
-                        return
-            except Exception as e:
-                logger.warning(f"[오너클랜] REST 인증 실패: {e}")
-
-            # Try GraphQL mutation for auth
-            try:
-                resp = await client.post(
-                    self.GRAPHQL_URL,
-                    json={"query": auth_query, "variables": {"username": self.username, "password": self.password}},
                     headers={"Content-Type": "application/json"},
                 )
                 if resp.status_code == 200:
-                    data = resp.json()
-                    token = data.get("data", {}).get("login", {}).get("token")
-                    if token:
-                        self._jwt_token = token
-                        self._token_expires_at = datetime.now().timestamp() + (23 * 3600)
-                        logger.info("[오너클랜] GraphQL 인증 성공")
-                        return
-                    errors = data.get("errors")
-                    if errors:
-                        raise HTTPException(status_code=401, detail=f"오너클랜 인증 실패: {errors[0].get('message', '계정 정보를 확인해주세요.')}")
+                    # 응답이 raw JWT 문자열이거나 JSON 객체일 수 있음
+                    token = resp.text.strip()
+                    # JSON 형태인 경우 파싱
+                    if token.startswith('{'):
+                        data = resp.json()
+                        token = data.get("token") or data.get("access_token") or data.get("jwt", "")
+                    self._jwt_token = token
+                    # 토큰 만료: 30일 (exp 클레임 기준)
+                    self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
+                    logger.info("[오너클랜] 인증 성공")
+                    return
+                else:
+                    error_msg = resp.text
+                    try:
+                        error_msg = resp.json().get("message", resp.text)
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=401,
+                        detail=f"오너클랜 인증 실패: {error_msg}"
+                    )
             except HTTPException:
                 raise
             except Exception as e:
-                logger.warning(f"[오너클랜] GraphQL 인증 실패: {e}")
-            
-            raise HTTPException(
-                status_code=401,
-                detail="오너클랜 API 인증에 실패했습니다. Render 환경변수의 OWNERCLAN_USERNAME/PASSWORD를 확인해주세요."
-            )
+                logger.error(f"[오너클랜] 인증 오류: {e}")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"오너클랜 API 연결 오류: {str(e)}"
+                )
 
     async def _get_headers(self) -> dict[str, str]:
         if self._jwt_token is None or datetime.now().timestamp() > self._token_expires_at:
