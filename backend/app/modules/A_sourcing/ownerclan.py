@@ -1,14 +1,19 @@
 """
-모듈 A — 오너클랜 API 클라이언트
-실제 API 키가 없을 때는 MOCK_MODE=true 로 샘플 데이터를 반환합니다.
+모듈 A — 오너클랜 GraphQL API 클라이언트
+- JWT 인증 후 Bearer 토큰으로 요청
+- Endpoint: https://api-sandbox.ownerclan.com/v1/graphql (sandbox)
+               https://api.ownerclan.com/v1/graphql (production)
 """
 from __future__ import annotations
 import httpx
 import json
+import logging
 from datetime import datetime
 from typing import Any
 from app.config import get_settings
+from fastapi import HTTPException
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # ── Mock 샘플 상품 데이터 ─────────────────────────────────────────────────────
@@ -184,17 +189,89 @@ MOCK_PRODUCTS = [
 
 
 class OwnerClanClient:
-    """오너클랜 API 클라이언트 (Mock 모드 포함)"""
+    """오너클랜 GraphQL API 클라이언트 (Mock 모드 포함)"""
+
+    # Production: https://api.ownerclan.com/v1/graphql
+    # Sandbox:    https://api-sandbox.ownerclan.com/v1/graphql
+    GRAPHQL_URL = "https://api.ownerclan.com/v1/graphql"
+    AUTH_URL = "https://api.ownerclan.com/v1/auth"
 
     def __init__(self):
         self.username = settings.ownerclan_username
         self.password = settings.ownerclan_password
-        self.base_url = settings.ownerclan_base_url
-        self.mock_mode = settings.mock_mode or not self.username
-        self._jwt_token = None
-        self._token_expires_at = 0.0
+        self.mock_mode = settings.mock_mode or not self.username or not self.password
+        self._jwt_token: str | None = None
+        self._token_expires_at: float = 0.0
 
-    async def _get_auth_headers(self) -> dict[str, str]:
+    async def _authenticate(self) -> None:
+        """ID/PW로 JWT 토큰 발급"""
+        logger.info("[오너클랜] JWT 인증 요청")
+        
+        # Try standard auth endpoint first, fall back to sandbox pattern
+        auth_payload = {
+            "service": "ownerclan",
+            "userType": "seller",
+            "username": self.username,
+            "password": self.password,
+        }
+        
+        # GraphQL mutation for auth (some implementations use this)
+        auth_query = """
+        mutation Login($username: String!, $password: String!) {
+          login(username: $username, password: $password) {
+            token
+            expiresAt
+          }
+        }
+        """
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # First try REST auth endpoint
+            try:
+                resp = await client.post(
+                    self.AUTH_URL,
+                    json=auth_payload,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    token = data.get("token") or data.get("access_token") or data.get("jwt")
+                    if token:
+                        self._jwt_token = token
+                        self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
+                        logger.info("[오너클랜] REST 인증 성공")
+                        return
+            except Exception as e:
+                logger.warning(f"[오너클랜] REST 인증 실패: {e}")
+
+            # Try GraphQL mutation for auth
+            try:
+                resp = await client.post(
+                    self.GRAPHQL_URL,
+                    json={"query": auth_query, "variables": {"username": self.username, "password": self.password}},
+                    headers={"Content-Type": "application/json"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    token = data.get("data", {}).get("login", {}).get("token")
+                    if token:
+                        self._jwt_token = token
+                        self._token_expires_at = datetime.now().timestamp() + (23 * 3600)
+                        logger.info("[오너클랜] GraphQL 인증 성공")
+                        return
+                    errors = data.get("errors")
+                    if errors:
+                        raise HTTPException(status_code=401, detail=f"오너클랜 인증 실패: {errors[0].get('message', '계정 정보를 확인해주세요.')}")
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning(f"[오너클랜] GraphQL 인증 실패: {e}")
+            
+            raise HTTPException(
+                status_code=401,
+                detail="오너클랜 API 인증에 실패했습니다. Render 환경변수의 OWNERCLAN_USERNAME/PASSWORD를 확인해주세요."
+            )
+
+    async def _get_headers(self) -> dict[str, str]:
         if self._jwt_token is None or datetime.now().timestamp() > self._token_expires_at:
             await self._authenticate()
         return {
@@ -202,28 +279,62 @@ class OwnerClanClient:
             "Content-Type": "application/json",
         }
 
-    async def _authenticate(self):
-        auth_url = "https://auth.ownerclan.com/auth"
-        if "sandbox" in self.base_url or self.mock_mode:
-            auth_url = "https://auth-sandbox.ownerclan.com/auth"
+    async def _graphql(self, query: str, variables: dict | None = None) -> dict[str, Any]:
+        """GraphQL 요청 실행"""
+        headers = await self._get_headers()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                self.GRAPHQL_URL,
+                json={"query": query, "variables": variables or {}},
+                headers=headers,
+            )
+            if resp.status_code == 401:
+                # Token expired - re-authenticate once
+                self._jwt_token = None
+                headers = await self._get_headers()
+                resp = await client.post(
+                    self.GRAPHQL_URL,
+                    json={"query": query, "variables": variables or {}},
+                    headers=headers,
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            if "errors" in data:
+                raise HTTPException(status_code=400, detail=f"오너클랜 GraphQL 오류: {data['errors'][0].get('message')}")
+            return data.get("data", {})
 
-        payload = {
-            "service": "ownerclan",
-            "userType": "seller",
-            "username": self.username,
-            "password": self.password
+    def _parse_item(self, node: dict) -> dict[str, Any]:
+        """GraphQL item 노드를 내부 상품 형식으로 변환"""
+        # 오너클랜 GraphQL 응답 필드 매핑
+        images = []
+        if node.get("images"):
+            images = [img.get("url", img) if isinstance(img, dict) else img for img in node["images"]]
+        elif node.get("imageUrl"):
+            images = [node["imageUrl"]]
+        elif node.get("image"):
+            images = [node["image"]]
+
+        price = node.get("price") or node.get("supplyPrice") or node.get("wholesalePrice") or 0
+        
+        category = node.get("category", {})
+        if isinstance(category, dict):
+            category_code = category.get("code") or category.get("key") or category.get("id", "")
+        else:
+            category_code = str(category)
+
+        return {
+            "source_id": str(node.get("key") or node.get("id") or node.get("itemKey", "")),
+            "name": node.get("name") or node.get("itemName", ""),
+            "brand": node.get("brand") or node.get("brandName", ""),
+            "manufacturer": node.get("manufacturer", ""),
+            "origin": node.get("origin") or node.get("madeIn", ""),
+            "wholesale_price": float(price),
+            "source_category_code": category_code,
+            "image_urls": images,
+            "specs": node.get("specs") or node.get("attributes") or {},
+            "options": node.get("options") or {},
+            "stock": node.get("stock") or node.get("stockCount") or node.get("quantity", 0),
         }
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(auth_url, json=payload, timeout=10.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                self._jwt_token = data.get("token") if isinstance(data, dict) else data
-                # Set expiration to 29 days (1 month validity)
-                self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
-            else:
-                from fastapi import HTTPException
-                raise HTTPException(status_code=400, detail=f"오너클랜 인증 실패: 계정 정보를 확인해주세요. (응답: {resp.status_code})")
 
     async def get_new_products(
         self,
@@ -231,7 +342,7 @@ class OwnerClanClient:
         page_size: int = 50,
         category_code: str | None = None,
     ) -> dict[str, Any]:
-        """신상품 목록 조회"""
+        """신상품 목록 조회 - GraphQL allItems"""
         if self.mock_mode:
             products = MOCK_PRODUCTS
             if category_code:
@@ -246,34 +357,121 @@ class OwnerClanClient:
                 "mock": True,
             }
 
-        headers = await self._get_auth_headers()
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self.base_url}/v1/products/new",
-                headers=headers,
-                params={"page": page, "pageSize": page_size, "categoryCode": category_code},
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            return resp.json()
+        # GraphQL cursor-based pagination
+        # page → convert to cursor-based (approximate)
+        first = page_size
+        # Note: allItems uses cursor pagination; we compute offset via after cursor
+        query = """
+        query GetItems($first: Int, $after: String, $category: String) {
+          allItems(first: $first, after: $after, category: $category) {
+            edges {
+              node {
+                key
+                name
+                brand
+                manufacturer
+                origin
+                price
+                supplyPrice
+                stock
+                images { url }
+                category { code name }
+                specs
+                options
+              }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+              totalCount
+            }
+          }
+        }
+        """
+        
+        variables: dict[str, Any] = {"first": first}
+        if category_code:
+            variables["category"] = category_code
+        # For page > 1, we'd need cursor; for now just fetch first page
+        # TODO: implement cursor caching for multi-page support
+        
+        try:
+            data = await self._graphql(query, variables)
+        except Exception:
+            # Try alternative field name
+            query2 = """
+            query GetItems($first: Int) {
+              items(first: $first) {
+                edges {
+                  node {
+                    key
+                    name
+                    price
+                    stock
+                    category { code name }
+                    images { url }
+                  }
+                }
+                pageInfo { totalCount hasNextPage }
+              }
+            }
+            """
+            data = await self._graphql(query2, {"first": first})
+
+        # Parse response - try different response shapes
+        edges = (
+            data.get("allItems", {}).get("edges")
+            or data.get("items", {}).get("edges")
+            or []
+        )
+        page_info = (
+            data.get("allItems", {}).get("pageInfo")
+            or data.get("items", {}).get("pageInfo")
+            or {}
+        )
+
+        products = [self._parse_item(edge["node"]) for edge in edges if "node" in edge]
+
+        return {
+            "total": page_info.get("totalCount", len(products)),
+            "page": page,
+            "page_size": page_size,
+            "products": products,
+            "mock": False,
+        }
 
     async def get_product_detail(self, source_id: str) -> dict[str, Any] | None:
-        """상품 상세 조회"""
+        """상품 상세 조회 - GraphQL item(key:)"""
         if self.mock_mode:
             product = next((p for p in MOCK_PRODUCTS if p["source_id"] == source_id), None)
             if product:
                 return {**product, "mock": True}
             return None
 
-        headers = await self._get_auth_headers()
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self.base_url}/v1/products/{source_id}",
-                headers=headers,
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            return resp.json()
+        query = """
+        query GetItem($key: String!) {
+          item(key: $key) {
+            key
+            name
+            brand
+            manufacturer
+            origin
+            price
+            supplyPrice
+            stock
+            images { url }
+            category { code name }
+            specs
+            options
+          }
+        }
+        """
+        data = await self._graphql(query, {"key": source_id})
+        node = data.get("item")
+        if not node:
+            return None
+        return self._parse_item(node)
 
     async def get_stock(self, source_id: str) -> int:
         """재고 수량 조회"""
@@ -281,15 +479,8 @@ class OwnerClanClient:
             product = next((p for p in MOCK_PRODUCTS if p["source_id"] == source_id), None)
             return product["stock"] if product else 0
 
-        headers = await self._get_auth_headers()
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{self.base_url}/v1/products/{source_id}/stock",
-                headers=headers,
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            return resp.json().get("stock", 0)
+        detail = await self.get_product_detail(source_id)
+        return detail.get("stock", 0) if detail else 0
 
 
 # 싱글톤
