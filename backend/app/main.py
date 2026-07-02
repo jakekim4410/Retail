@@ -92,3 +92,29 @@ async def root():
 @app.get("/health", tags=["상태"])
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/settings/status", tags=["설정"])
+async def settings_status():
+    """API 키 연동 현황 조회 (값 노출 없이 설정 여부만 반환)"""
+    return {
+        "mock_mode": settings.mock_mode,
+        "ownerclan": {
+            "configured": bool(settings.ownerclan_username and settings.ownerclan_password),
+        },
+        "coupang": {
+            "configured": bool(settings.coupang_access_key and settings.coupang_secret_key and settings.coupang_vendor_id),
+            "vendor_id": settings.coupang_vendor_id or None,
+        },
+        "anthropic": {
+            "configured": bool(settings.anthropic_api_key),
+            "model": settings.claude_model,
+        },
+        "slack": {
+            "configured": bool(settings.slack_webhook_url),
+        },
+        "policy": {
+            "margin_threshold_percent": settings.margin_threshold_percent,
+            "poor_sales_days": settings.poor_sales_days,
+        }
+    }

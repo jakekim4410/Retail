@@ -30,8 +30,9 @@ class CoupangClient:
 
     # ── 인증 ───────────────────────────────────────────────────────────────
     def _generate_hmac(self, method: str, path: str, query: str = "") -> dict[str, str]:
-        """쿠팡 HMAC-SHA256 인증 헤더 생성"""
+        """쿠팡 HMAC-SHA256 인증 헤더 생성 (쿠팡 Open API 표준)"""
         datetime_str = datetime.now(timezone.utc).strftime("%y%m%dT%H%M%SZ")
+        # 쿠팡 공식 서명 메시지 형식: datetime + method + path + query
         message = f"{datetime_str}{method}{path}{query}"
         signature = hmac.new(
             self.secret_key.encode("utf-8"),
@@ -43,6 +44,7 @@ class CoupangClient:
                 f"CEA algorithm=HmacSHA256, access-key={self.access_key}, "
                 f"signed-date={datetime_str}, signature={signature}"
             ),
+            "X-Coupang-Target-Market": "KR",
             "Content-Type": "application/json;charset=UTF-8",
         }
 

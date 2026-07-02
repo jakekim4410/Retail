@@ -8,8 +8,8 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # 오너클랜
-    ownerclan_api_key: str = Field(default="", alias="OWNERCLAN_API_KEY")
-    ownerclan_api_secret: str = Field(default="", alias="OWNERCLAN_API_SECRET")
+    ownerclan_username: str = Field(default="", alias="OWNERCLAN_USERNAME")
+    ownerclan_password: str = Field(default="", alias="OWNERCLAN_PASSWORD")
     ownerclan_base_url: str = Field(default="https://api.ownerclan.com", alias="OWNERCLAN_BASE_URL")
 
     # 쿠팡

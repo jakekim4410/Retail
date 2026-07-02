@@ -187,10 +187,42 @@ class OwnerClanClient:
     """오너클랜 API 클라이언트 (Mock 모드 포함)"""
 
     def __init__(self):
-        self.api_key = settings.ownerclan_api_key
-        self.api_secret = settings.ownerclan_api_secret
+        self.username = settings.ownerclan_username
+        self.password = settings.ownerclan_password
         self.base_url = settings.ownerclan_base_url
-        self.mock_mode = settings.mock_mode or not self.api_key
+        self.mock_mode = settings.mock_mode or not self.username
+        self._jwt_token = None
+        self._token_expires_at = 0.0
+
+    async def _get_auth_headers(self) -> dict[str, str]:
+        if self._jwt_token is None or datetime.now().timestamp() > self._token_expires_at:
+            await self._authenticate()
+        return {
+            "Authorization": f"Bearer {self._jwt_token}",
+            "Content-Type": "application/json",
+        }
+
+    async def _authenticate(self):
+        auth_url = "https://auth.ownerclan.com/auth"
+        if "sandbox" in self.base_url or self.mock_mode:
+            auth_url = "https://auth-sandbox.ownerclan.com/auth"
+
+        payload = {
+            "service": "ownerclan",
+            "userType": "seller",
+            "username": self.username,
+            "password": self.password
+        }
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(auth_url, json=payload, timeout=10.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                self._jwt_token = data.get("token") if isinstance(data, dict) else data
+                # Set expiration to 29 days (1 month validity)
+                self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
+            else:
+                raise Exception(f"Ownerclan Auth Failed: {resp.status_code} {resp.text}")
 
     async def get_new_products(
         self,
@@ -213,10 +245,11 @@ class OwnerClanClient:
                 "mock": True,
             }
 
+        headers = await self._get_auth_headers()
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.base_url}/v1/products/new",
-                headers=self._auth_headers(),
+                headers=headers,
                 params={"page": page, "pageSize": page_size, "categoryCode": category_code},
                 timeout=30.0,
             )
@@ -231,10 +264,11 @@ class OwnerClanClient:
                 return {**product, "mock": True}
             return None
 
+        headers = await self._get_auth_headers()
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.base_url}/v1/products/{source_id}",
-                headers=self._auth_headers(),
+                headers=headers,
                 timeout=30.0,
             )
             resp.raise_for_status()
@@ -246,21 +280,15 @@ class OwnerClanClient:
             product = next((p for p in MOCK_PRODUCTS if p["source_id"] == source_id), None)
             return product["stock"] if product else 0
 
+        headers = await self._get_auth_headers()
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{self.base_url}/v1/products/{source_id}/stock",
-                headers=self._auth_headers(),
+                headers=headers,
                 timeout=30.0,
             )
             resp.raise_for_status()
             return resp.json().get("stock", 0)
-
-    def _auth_headers(self) -> dict[str, str]:
-        return {
-            "X-API-Key": self.api_key,
-            "X-API-Secret": self.api_secret,
-            "Content-Type": "application/json",
-        }
 
 
 # 싱글톤
