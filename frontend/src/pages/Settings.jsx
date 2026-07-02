@@ -49,10 +49,10 @@ export default function Settings() {
                 )}
               </div>
               <div style={{ padding: 16, background: 'var(--surface-secondary)', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Claude (Anthropic)</div>
-                <StatusBadge configured={status.anthropic?.configured} />
-                {status.anthropic?.configured && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{status.anthropic.model}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Gemini (Google)</div>
+                <StatusBadge configured={status.gemini?.configured} />
+                {status.gemini?.configured && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{status.gemini.model}</div>
                 )}
               </div>
               <div style={{ padding: 16, background: 'var(--surface-secondary)', borderRadius: 8 }}>
@@ -92,7 +92,7 @@ export default function Settings() {
                 { label: '쿠팡 Vendor ID', key: 'COUPANG_VENDOR_ID', example: 'A00123456' },
                 { label: '쿠팡 Access Key', key: 'COUPANG_ACCESS_KEY', example: 'coupang에서 발급받은 키' },
                 { label: '쿠팡 Secret Key', key: 'COUPANG_SECRET_KEY', example: 'coupang에서 발급받은 시크릿' },
-                { label: 'Claude API Key', key: 'ANTHROPIC_API_KEY', example: 'sk-ant-api03-...' },
+                { label: 'Gemini API Key', key: 'GEMINI_API_KEY', example: 'AIzaSy...' },
                 { label: 'Slack Webhook URL', key: 'SLACK_WEBHOOK_URL', example: 'https://hooks.slack.com/...' },
                 { label: 'Mock 모드 해제', key: 'MOCK_MODE', example: 'false (실제 운영 시)' },
               ].map(({ label, key, example }) => (
