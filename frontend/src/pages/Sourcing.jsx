@@ -78,11 +78,22 @@ export default function Sourcing() {
     setLoading(true)
     setScanResult(null)
     try {
-      const r = await fetch(
+      const resp = await fetch(
         `/api/sourcing/scan?target_margin_pct=${targetMargin}&monthly_sales_estimate=500000&page_size=20`,
         { method: 'POST' }
       )
-      const data = await r.json()
+      
+      let data;
+      const text = await resp.text();
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        throw new Error(resp.ok ? "Invalid JSON format from server" : (text || `HTTP Error ${resp.status}`));
+      }
+
+      if (!resp.ok) {
+        throw new Error(data.detail || data.message || "스캔 중 서버 오류가 발생했습니다.")
+      }
       setScanResult(data)
     } catch (e) {
       alert('스캔 오류: ' + e.message)

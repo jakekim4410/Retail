@@ -222,7 +222,8 @@ class OwnerClanClient:
                 # Set expiration to 29 days (1 month validity)
                 self._token_expires_at = datetime.now().timestamp() + (29 * 24 * 3600)
             else:
-                raise Exception(f"Ownerclan Auth Failed: {resp.status_code} {resp.text}")
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail=f"오너클랜 인증 실패: 계정 정보를 확인해주세요. (응답: {resp.status_code})")
 
     async def get_new_products(
         self,
