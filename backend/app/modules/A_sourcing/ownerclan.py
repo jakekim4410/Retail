@@ -290,35 +290,53 @@ class OwnerClanClient:
 
     def _parse_item(self, node: dict) -> dict[str, Any]:
         """GraphQL item 노드를 내부 상품 형식으로 변환"""
-        # 오너클랜 GraphQL 응답 필드 매핑
-        images = []
-        if node.get("images"):
-            images = [img.get("url", img) if isinstance(img, dict) else img for img in node["images"]]
-        elif node.get("imageUrl"):
-            images = [node["imageUrl"]]
-        elif node.get("image"):
-            images = [node["image"]]
-
-        price = node.get("price") or node.get("supplyPrice") or node.get("wholesalePrice") or 0
+        # 이미지: images(size: large) 배열
+        images = node.get("images") or []
+        if isinstance(images, list):
+            # 문자열 URL 배열 그대로 사용
+            images = [img if isinstance(img, str) else img.get("url", "") for img in images]
         
-        category = node.get("category", {})
-        if isinstance(category, dict):
-            category_code = category.get("code") or category.get("key") or category.get("id", "")
-        else:
-            category_code = str(category)
+        # 가격: price(currency: KRW) -> 정수
+        price = node.get("price") or 0
+        
+        # 카테고리: {key, name}
+        category = node.get("category") or {}
+        category_code = category.get("key", "") if isinstance(category, dict) else str(category)
+        category_name = category.get("name", "") if isinstance(category, dict) else ""
+        
+        # 옵션: [{price, quantity, key, optionAttributes: [{name, value}]}]
+        raw_options = node.get("options") or []
+        # 재고 = 옵션 수량 합계
+        stock = sum(opt.get("quantity", 0) for opt in raw_options if isinstance(opt, dict))
+        if stock == 0:
+            stock = node.get("stock") or 0
+        
+        # 옵션을 {"선택속성명": ["val1", "val2"]} 형태로 정리
+        options_dict: dict = {}
+        for opt in raw_options:
+            if not isinstance(opt, dict):
+                continue
+            for attr in (opt.get("optionAttributes") or []):
+                name = attr.get("name", "")
+                value = attr.get("value", "")
+                if name:
+                    options_dict.setdefault(name, [])
+                    if value and value not in options_dict[name]:
+                        options_dict[name].append(value)
 
         return {
-            "source_id": str(node.get("key") or node.get("id") or node.get("itemKey", "")),
-            "name": node.get("name") or node.get("itemName", ""),
-            "brand": node.get("brand") or node.get("brandName", ""),
-            "manufacturer": node.get("manufacturer", ""),
-            "origin": node.get("origin") or node.get("madeIn", ""),
+            "source_id": str(node.get("key") or ""),
+            "name": node.get("name") or "",
+            "brand": node.get("brand") or "",
+            "manufacturer": node.get("manufacturer") or "",
+            "origin": node.get("origin") or "",
             "wholesale_price": float(price),
             "source_category_code": category_code,
+            "source_category_name": category_name,
             "image_urls": images,
-            "specs": node.get("specs") or node.get("attributes") or {},
-            "options": node.get("options") or {},
-            "stock": node.get("stock") or node.get("stockCount") or node.get("quantity", 0),
+            "specs": node.get("attributes") or {},
+            "options": options_dict,
+            "stock": stock,
         }
 
     async def get_new_products(
@@ -342,13 +360,11 @@ class OwnerClanClient:
                 "mock": True,
             }
 
-        # GraphQL cursor-based pagination
-        # page → convert to cursor-based (approximate)
+        # GraphQL cursor-based pagination (실제 API 응답 업데이트됨)
         first = page_size
-        # Note: allItems uses cursor pagination; we compute offset via after cursor
         query = """
-        query GetItems($first: Int, $after: String, $category: String) {
-          allItems(first: $first, after: $after, category: $category) {
+        query GetItems($first: Int, $after: String) {
+          allItems(first: $first, after: $after) {
             edges {
               node {
                 key
@@ -356,20 +372,25 @@ class OwnerClanClient:
                 brand
                 manufacturer
                 origin
-                price
-                supplyPrice
-                stock
-                images { url }
-                category { code name }
-                specs
-                options
+                price(currency: KRW)
+                images(size: large)
+                category { key name }
+                options {
+                  price(currency: KRW)
+                  quantity
+                  key
+                  optionAttributes { name value }
+                }
+                attributes
+                status
               }
               cursor
             }
             pageInfo {
               hasNextPage
+              count
+              startCursor
               endCursor
-              totalCount
             }
           }
         }
@@ -377,49 +398,25 @@ class OwnerClanClient:
         
         variables: dict[str, Any] = {"first": first}
         if category_code:
-            variables["category"] = category_code
-        # For page > 1, we'd need cursor; for now just fetch first page
-        # TODO: implement cursor caching for multi-page support
+            # category 필터는 allItems에 직접 지원 안될 수 있어 포스트 필터링
+            pass
         
-        try:
-            data = await self._graphql(query, variables)
-        except Exception:
-            # Try alternative field name
-            query2 = """
-            query GetItems($first: Int) {
-              items(first: $first) {
-                edges {
-                  node {
-                    key
-                    name
-                    price
-                    stock
-                    category { code name }
-                    images { url }
-                  }
-                }
-                pageInfo { totalCount hasNextPage }
-              }
-            }
-            """
-            data = await self._graphql(query2, {"first": first})
+        data = await self._graphql(query, variables)
 
         # Parse response - try different response shapes
-        edges = (
-            data.get("allItems", {}).get("edges")
-            or data.get("items", {}).get("edges")
-            or []
-        )
-        page_info = (
-            data.get("allItems", {}).get("pageInfo")
-            or data.get("items", {}).get("pageInfo")
-            or {}
-        )
+        edges = data.get("allItems", {}).get("edges") or []
+        page_info = data.get("allItems", {}).get("pageInfo") or {}
 
-        products = [self._parse_item(edge["node"]) for edge in edges if "node" in edge]
+        all_products = [self._parse_item(edge["node"]) for edge in edges if "node" in edge]
+        
+        # category_code 필터 (API 레벨에서 지원 안하므로 포스트 필터링)
+        if category_code:
+            products = [p for p in all_products if p["source_category_code"] == category_code]
+        else:
+            products = all_products
 
         return {
-            "total": page_info.get("totalCount", len(products)),
+            "total": page_info.get("count", len(products)),
             "page": page,
             "page_size": page_size,
             "products": products,
