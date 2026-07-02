@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  body { background: #fff; color: #222; }
+  .container { max-width: 860px; margin: 0 auto; padding: 0; }
+
+  /* 헤더 배너 */
+  .product-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white;
+    padding: 48px 40px;
+    text-align: center;
+  }
+  .product-header .brand-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    letter-spacing: 1px;
+  }
+  .product-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+  .product-header .origin-badge {
+    display: inline-block;
+    background: #e94560;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* 이미지 갤러리 */
+  .image-gallery {
+    padding: 32px 24px;
+    background: #f8f9fa;
+  }
+  .image-gallery h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1a1a2e;
+    border-left: 4px solid #e94560;
+    padding-left: 12px;
+  }
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .image-grid img {
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: block;
+  }
+
+  /* 설명 섹션 */
+  .description-section {
+    padding: 40px 24px;
+    background: #fff;
+  }
+  .description-section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1a1a2e;
+    border-left: 4px solid #e94560;
+    padding-left: 12px;
+  }
+  .description-text {
+    font-size: 15px;
+    line-height: 1.9;
+    color: #444;
+    white-space: pre-line;
+  }
+
+  /* 스펙 테이블 */
+  .spec-section {
+    padding: 32px 24px;
+    background: #f8f9fa;
+  }
+  .spec-section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1a1a2e;
+    border-left: 4px solid #0f3460;
+    padding-left: 12px;
+  }
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .spec-table tr:nth-child(even) { background: #f0f4ff; }
+  .spec-table td {
+    padding: 12px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid #e8ecf0;
+    vertical-align: top;
+  }
+  .spec-table td:first-child {
+    font-weight: 600;
+    color: #1a1a2e;
+    width: 35%;
+    background: rgba(15,52,96,0.05);
+  }
+
+  /* 옵션 섹션 */
+  .option-section {
+    padding: 32px 24px;
+    background: #fff;
+  }
+  .option-section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1a1a2e;
+    border-left: 4px solid #0f3460;
+    padding-left: 12px;
+  }
+  .option-group { margin-bottom: 16px; }
+  .option-label { font-size: 13px; font-weight: 600; color: #666; margin-bottom: 8px; }
+  .option-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .option-tag {
+    background: #f0f4ff;
+    border: 1.5px solid #c8d8f8;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: #1a1a2e;
+    font-weight: 500;
+  }
+
+  /* 배송/정책 */
+  .policy-section {
+    padding: 32px 24px;
+    background: #1a1a2e;
+    color: white;
+  }
+  .policy-section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 24px;
+    border-left: 4px solid #e94560;
+    padding-left: 12px;
+  }
+  .policy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .policy-card {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .policy-card .icon { font-size: 28px; margin-bottom: 8px; }
+  .policy-card .title { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+  .policy-card .value { font-size: 15px; font-weight: 600; }
+
+  /* 고시정보 */
+  .notice-section {
+    padding: 32px 24px;
+    background: #fff;
+    border-top: 1px solid #eee;
+  }
+  .notice-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #666;
+  }
+  .notice-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .notice-table td {
+    padding: 8px 16px;
+    border: 1px solid #e0e0e0;
+    color: #555;
+    vertical-align: top;
+  }
+  .notice-table td:first-child {
+    font-weight: 600;
+    background: #f5f5f5;
+    width: 35%;
+    color: #333;
+  }
+
+  /* 푸터 */
+  .footer {
+    background: #0d0d1a;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 헤더 -->
+  <div class="product-header">
+    {% if brand %}
+    <div class="brand-badge">✦ {{ brand }}</div>
+    {% endif %}
+    <h1>{{ name }}</h1>
+    {% if origin %}
+    <span class="origin-badge">🏭 제조국: {{ origin }}</span>
+    {% endif %}
+  </div>
+
+  <!-- 이미지 갤러리 -->
+  {% if image_urls %}
+  <div class="image-gallery">
+    <h2>📸 상품 이미지</h2>
+    <div class="image-grid">
+      {% for img_url in image_urls %}
+      <img src="{{ img_url }}" alt="{{ name }} 이미지 {{ loop.index }}" loading="lazy">
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 상품 설명 -->
+  <div class="description-section">
+    <h2>💬 상품 소개</h2>
+    <p class="description-text">{{ description }}</p>
+  </div>
+
+  <!-- 스펙 테이블 -->
+  {% if specs %}
+  <div class="spec-section">
+    <h2>📋 상품 스펙</h2>
+    <table class="spec-table">
+      {% for key, value in specs.items() %}
+      <tr>
+        <td>{{ key }}</td>
+        <td>{{ value }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- 옵션 -->
+  {% if options %}
+  <div class="option-section">
+    <h2>🎨 상품 옵션</h2>
+    {% for opt_name, opt_values in options.items() %}
+    <div class="option-group">
+      <div class="option-label">{{ opt_name }}</div>
+      <div class="option-tags">
+        {% for val in opt_values %}
+        <span class="option-tag">{{ val }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- 배송/교환 정책 -->
+  <div class="policy-section">
+    <h2>📦 배송 및 교환/반품 안내</h2>
+    <div class="policy-grid">
+      <div class="policy-card">
+        <div class="icon">🚚</div>
+        <div class="title">배송방법</div>
+        <div class="value">택배 배송</div>
+      </div>
+      <div class="policy-card">
+        <div class="icon">⏰</div>
+        <div class="title">배송기간</div>
+        <div class="value">2~5 영업일</div>
+      </div>
+      <div class="policy-card">
+        <div class="icon">🔄</div>
+        <div class="title">교환/반품</div>
+        <div class="value">수령 후 7일</div>
+      </div>
+      <div class="policy-card">
+        <div class="icon">💰</div>
+        <div class="title">반품배송비</div>
+        <div class="value">왕복 5,000원</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상품정보제공고시 -->
+  <div class="notice-section">
+    <h2>상품정보제공고시</h2>
+    <table class="notice-table">
+      {% for key, value in notice_info.items() %}
+      <tr>
+        <td>{{ key }}</td>
+        <td>{{ value }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="footer">
+    본 상품은 위탁판매 상품으로 제조사로부터 정식 계약을 통해 공급받은 상품입니다.<br>
+    궁금하신 점은 판매자 문의를 이용해 주세요.
+  </div>
+
+</div>
+</body>
+</html>
