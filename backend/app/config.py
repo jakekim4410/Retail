@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     coupang_vendor_id: str = Field(default="", alias="COUPANG_VENDOR_ID")
     coupang_base_url: str = Field(default="https://api-gateway.coupang.com", alias="COUPANG_BASE_URL")
 
-    # Anthropic
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    claude_model: str = Field(default="claude-3-5-sonnet-20241022", alias="CLAUDE_MODEL")
+    # Gemini (Google)
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
 
     # Slack
     slack_webhook_url: str = Field(default="", alias="SLACK_WEBHOOK_URL")

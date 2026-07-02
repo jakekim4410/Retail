@@ -106,9 +106,9 @@ async def settings_status():
             "configured": bool(settings.coupang_access_key and settings.coupang_secret_key and settings.coupang_vendor_id),
             "vendor_id": settings.coupang_vendor_id or None,
         },
-        "anthropic": {
-            "configured": bool(settings.anthropic_api_key),
-            "model": settings.claude_model,
+        "gemini": {
+            "configured": bool(settings.gemini_api_key),
+            "model": settings.gemini_model,
         },
         "slack": {
             "configured": bool(settings.slack_webhook_url),
