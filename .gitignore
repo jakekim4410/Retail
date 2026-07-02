@@ -18,3 +18,4 @@ sales_automation.db
 *.log
 *.coverage
 .pytest_cache/
+test_*.py
