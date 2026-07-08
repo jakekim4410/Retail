@@ -14,7 +14,7 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
-async def send_slack(message: str, blocks: list | None = None) -> bool:
+async def send_slack(message: str, blocks: Optional[list] = None) -> bool:
     """Slack Webhook으로 메시지 발송"""
     if not settings.slack_webhook_url:
         logger.info(f"[SLACK 시뮬레이션] {message}")

@@ -71,6 +71,17 @@ app.add_middleware(
 )
 
 # 라우터 등록
+
+import traceback
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    err = traceback.format_exc()
+    print('GLOBAL EXCEPTION:', err)
+    return JSONResponse(status_code=500, content={'detail': 'Internal Server Error', 'traceback': err})
+
 app.include_router(sourcing_router)
 app.include_router(detail_page_router)
 app.include_router(registration_router)

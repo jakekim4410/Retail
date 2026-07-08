@@ -9,12 +9,31 @@ import httpx
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from app.config import get_settings
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# ── Mock 카테고리 데이터 ───────────────────────────────────────────────────────
+MOCK_CATEGORIES = [
+    {"code": "ELEC-AUDIO",   "name": "이어폰/음향",   "icon": "🎧", "count": 124},
+    {"code": "ELEC-LIGHT",   "name": "조명/LED",       "icon": "💡", "count": 87},
+    {"code": "ELEC-ETC",     "name": "전자기기 기타",  "icon": "🔌", "count": 203},
+    {"code": "KITCHEN-CUP",  "name": "컵/텀블러",      "icon": "☕", "count": 156},
+    {"code": "KITCHEN-ETC",  "name": "주방용품",        "icon": "🍳", "count": 312},
+    {"code": "TRAVEL-ACC",   "name": "여행소품",        "icon": "✈️", "count": 98},
+    {"code": "SPORTS-YOGA",  "name": "요가/피트니스",  "icon": "🧘", "count": 145},
+    {"code": "SPORTS-ETC",   "name": "스포츠 기타",    "icon": "⚽", "count": 267},
+    {"code": "CLEAN-CLOTH",  "name": "청소/세탁용품",  "icon": "🧹", "count": 189},
+    {"code": "HOME-DIFFUSER","name": "디퓨저/방향제", "icon": "🌸", "count": 76},
+    {"code": "HOME-ETC",     "name": "홈데코/인테리어","icon": "🏠", "count": 421},
+    {"code": "CAR-ACC",      "name": "차량용품",        "icon": "🚗", "count": 134},
+    {"code": "BEAUTY",       "name": "뷰티/화장품",    "icon": "💄", "count": 389},
+    {"code": "FASHION",      "name": "패션/의류",       "icon": "👕", "count": 512},
+    {"code": "FOOD",         "name": "식품/건강",       "icon": "🥗", "count": 278},
+]
 
 # ── Mock 샘플 상품 데이터 ─────────────────────────────────────────────────────
 MOCK_PRODUCTS = [
@@ -200,7 +219,7 @@ class OwnerClanClient:
         self.username = settings.ownerclan_username
         self.password = settings.ownerclan_password
         self.mock_mode = settings.mock_mode or not self.username or not self.password
-        self._jwt_token: str | None = None
+        self._jwt_token: Optional[str] = None
         self._token_expires_at: float = 0.0
 
     async def _authenticate(self) -> None:
@@ -264,7 +283,7 @@ class OwnerClanClient:
             "Content-Type": "application/json",
         }
 
-    async def _graphql(self, query: str, variables: dict | None = None) -> dict[str, Any]:
+    async def _graphql(self, query: str, variables: Optional[dict] = None) -> dict[str, Any]:
         """GraphQL 요청 실행"""
         headers = await self._get_headers()
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -339,38 +358,89 @@ class OwnerClanClient:
             "stock": stock,
         }
 
+    async def get_categories(self) -> list[dict[str, Any]]:
+        """소싱 가능 카테고리 목록 반환"""
+        if self.mock_mode:
+            return MOCK_CATEGORIES
+        try:
+            query = """
+            query {
+              allCategories(first: 20) {
+                edges {
+                  node {
+                    key
+                    name
+                  }
+                }
+              }
+            }
+            """
+            data = await self._graphql(query)
+            edges = data.get("allCategories", {}).get("edges", [])
+            categories = []
+            for e in edges:
+                node = e.get("node", {})
+                if node.get("key"):
+                    categories.append({
+                        "code": node.get("key"),
+                        "name": node.get("name"),
+                        "icon": "📦",
+                        "count": 0
+                    })
+            return categories if categories else MOCK_CATEGORIES
+        except Exception as e:
+            logger.warning(f"[오너클랜] 카테고리 조회 실패, Mock fallback 사용: {e}")
+            return MOCK_CATEGORIES
+
     async def get_new_products(
         self,
         page: int = 1,
         page_size: int = 50,
-        category_code: str | None = None,
+        category_code: Optional[str] = None,
     ) -> dict[str, Any]:
         """신상품 목록 조회 - GraphQL allItems"""
         if self.mock_mode:
-            products = MOCK_PRODUCTS
-            if category_code:
-                products = [p for p in products if p["source_category_code"] == category_code]
-            start = (page - 1) * page_size
-            end = start + page_size
-            return {
-                "total": len(products),
-                "page": page,
-                "page_size": page_size,
-                "products": products[start:end],
-                "mock": True,
-            }
+            return self._mock_products(page, page_size, category_code)
 
-        # GraphQL cursor-based pagination (실제 API 응답 업데이트됨)
+        # 실제 API 호출 — 실패 시 Mock fallback
+        try:
+            return await self._real_get_new_products(page, page_size, category_code)
+        except Exception as e:
+            logger.warning(f"[오너클랜] 실제 API 호출 실패, Mock fallback 사용: {e}")
+            return self._mock_products(page, page_size, category_code)
+
+    def _mock_products(self, page: int, page_size: int, category_code: Optional[str]) -> dict[str, Any]:
+        """Mock 상품 목록 반환"""
+        products = MOCK_PRODUCTS
+        if category_code:
+            products = [p for p in products if p["source_category_code"] == category_code]
+        start = (page - 1) * page_size
+        end = start + page_size
+        return {
+            "total": len(products),
+            "page": page,
+            "page_size": page_size,
+            "products": products[start:end],
+            "mock": True,
+        }
+
+    async def _real_get_new_products(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        category_code: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """실제 오너클랜 GraphQL API 호출"""
+
+        # GraphQL cursor-based pagination
         first = page_size
         query = """
-        query GetItems($first: Int, $after: String) {
-          allItems(first: $first, after: $after) {
+        query GetItems($first: Int, $after: String, $category: String) {
+          allItems(first: $first, after: $after, category: $category) {
             edges {
               node {
                 key
                 name
-                brand
-                manufacturer
                 origin
                 price(currency: KRW)
                 images(size: large)
@@ -395,25 +465,15 @@ class OwnerClanClient:
           }
         }
         """
-        
         variables: dict[str, Any] = {"first": first}
         if category_code:
-            # category 필터는 allItems에 직접 지원 안될 수 있어 포스트 필터링
-            pass
-        
+            variables["category"] = category_code
+            
         data = await self._graphql(query, variables)
 
-        # Parse response - try different response shapes
         edges = data.get("allItems", {}).get("edges") or []
         page_info = data.get("allItems", {}).get("pageInfo") or {}
-
-        all_products = [self._parse_item(edge["node"]) for edge in edges if "node" in edge]
-        
-        # category_code 필터 (API 레벨에서 지원 안하므로 포스트 필터링)
-        if category_code:
-            products = [p for p in all_products if p["source_category_code"] == category_code]
-        else:
-            products = all_products
+        products = [self._parse_item(edge["node"]) for edge in edges if "node" in edge]
 
         return {
             "total": page_info.get("count", len(products)),
@@ -423,7 +483,7 @@ class OwnerClanClient:
             "mock": False,
         }
 
-    async def get_product_detail(self, source_id: str) -> dict[str, Any] | None:
+    async def get_product_detail(self, source_id: str) -> Optional[dict[str, Any]]:
         """상품 상세 조회 - GraphQL item(key:)"""
         if self.mock_mode:
             product = next((p for p in MOCK_PRODUCTS if p["source_id"] == source_id), None)
@@ -436,8 +496,6 @@ class OwnerClanClient:
           item(key: $key) {
             key
             name
-            brand
-            manufacturer
             origin
             price
             supplyPrice

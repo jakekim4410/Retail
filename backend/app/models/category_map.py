@@ -1,8 +1,8 @@
+from __future__ import annotations
 """
 카테고리 매핑 DB 모델
 도매처 카테고리 코드 ↔ 쿠팡 카테고리 코드
 """
-from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import String, Integer, Float, DateTime, Boolean, Text
 from sqlalchemy.orm import Mapped, mapped_column

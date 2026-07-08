@@ -1,3 +1,4 @@
+from __future__ import annotations
 # app/models/__init__.py
 from app.models.product import Product, PriceHistory, ProductPerformance, ProductStatus
 from app.models.order import Order, OrderStatus

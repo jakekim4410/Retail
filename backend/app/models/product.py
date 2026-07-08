@@ -1,7 +1,8 @@
+from __future__ import annotations
+from typing import Optional
 """
 상품 관련 DB 모델
 """
-from __future__ import annotations
 from datetime import datetime
 from enum import Enum as PyEnum
 from sqlalchemy import (
@@ -32,28 +33,28 @@ class Product(Base):
     source_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     source_name: Mapped[str] = mapped_column(String(50), default="ownerclan")
     name: Mapped[str] = mapped_column(String(500))
-    brand: Mapped[str | None] = mapped_column(String(200))
-    manufacturer: Mapped[str | None] = mapped_column(String(200))
-    origin: Mapped[str | None] = mapped_column(String(100))
+    brand: Mapped[Optional[str]] = mapped_column(String(200))
+    manufacturer: Mapped[Optional[str]] = mapped_column(String(200))
+    origin: Mapped[Optional[str]] = mapped_column(String(100))
     # 가격
     wholesale_price: Mapped[float] = mapped_column(Float)
     sale_price: Mapped[float] = mapped_column(Float, default=0.0)
     # 카테고리
-    source_category_code: Mapped[str | None] = mapped_column(String(100))
-    coupang_category_id: Mapped[int | None] = mapped_column(Integer)
-    coupang_category_name: Mapped[str | None] = mapped_column(String(200))
+    source_category_code: Mapped[Optional[str]] = mapped_column(String(100))
+    coupang_category_id: Mapped[Optional[int]] = mapped_column(Integer)
+    coupang_category_name: Mapped[Optional[str]] = mapped_column(String(200))
     # 이미지
-    image_urls: Mapped[list | None] = mapped_column(JSON)
+    image_urls: Mapped[Optional[list]] = mapped_column(JSON)
     # 스펙/옵션
-    specs: Mapped[dict | None] = mapped_column(JSON)
-    options: Mapped[dict | None] = mapped_column(JSON)
+    specs: Mapped[Optional[dict]] = mapped_column(JSON)
+    options: Mapped[Optional[dict]] = mapped_column(JSON)
     # 마진 계산 결과
-    margin_rate: Mapped[float | None] = mapped_column(Float)
-    margin_amount: Mapped[float | None] = mapped_column(Float)
-    commission_rate: Mapped[float | None] = mapped_column(Float)
+    margin_rate: Mapped[Optional[float]] = mapped_column(Float)
+    margin_amount: Mapped[Optional[float]] = mapped_column(Float)
+    commission_rate: Mapped[Optional[float]] = mapped_column(Float)
     # 쿠팡 등록 정보
-    coupang_product_id: Mapped[str | None] = mapped_column(String(100))
-    detail_page_html: Mapped[str | None] = mapped_column(Text)
+    coupang_product_id: Mapped[Optional[str]] = mapped_column(String(100))
+    detail_page_html: Mapped[Optional[str]] = mapped_column(Text)
     # 상태
     status: Mapped[ProductStatus] = mapped_column(
         Enum(ProductStatus), default=ProductStatus.SOURCED
@@ -83,7 +84,7 @@ class PriceHistory(Base):
     sale_price: Mapped[float] = mapped_column(Float)
     margin_rate: Mapped[float] = mapped_column(Float)
     changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    change_reason: Mapped[str | None] = mapped_column(String(300))
+    change_reason: Mapped[Optional[str]] = mapped_column(String(300))
 
     product: Mapped[Product] = relationship("Product", back_populates="price_histories")
 
@@ -97,7 +98,7 @@ class ProductPerformance(Base):
     total_revenue: Mapped[float] = mapped_column(Float, default=0.0)
     total_net_profit: Mapped[float] = mapped_column(Float, default=0.0)
     return_qty: Mapped[int] = mapped_column(Integer, default=0)
-    last_sale_date: Mapped[datetime | None] = mapped_column(DateTime)
+    last_sale_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )

@@ -1,7 +1,8 @@
+from __future__ import annotations
+from typing import Optional
 """
 주문·판매 관련 DB 모델
 """
-from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import String, Float, Integer, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,8 +23,8 @@ class Order(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     coupang_order_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
-    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
-    coupang_product_id: Mapped[str | None] = mapped_column(String(100))
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id"))
+    coupang_product_id: Mapped[Optional[str]] = mapped_column(String(100))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     sale_price: Mapped[float] = mapped_column(Float)          # 판매가
     settlement_amount: Mapped[float] = mapped_column(Float, default=0.0)   # 실제 정산액

@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 # 카테고리별 쿠팡 수수료율 (source_category_code 기준)
 CATEGORY_COMMISSION_RATES: dict[str, float] = {
@@ -156,7 +156,7 @@ class MarginCalculator:
         self,
         wholesale_price: float,
         source_category_code: str,
-        target_margin_pct: float | None = None,
+        target_margin_pct: Optional[float] = None,
     ) -> float:
         """목표 마진율 달성을 위한 최소 판매가 역산"""
         target = target_margin_pct if target_margin_pct is not None else self.threshold_pct

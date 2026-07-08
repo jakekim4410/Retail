@@ -122,8 +122,8 @@ class CoupangClient:
     async def get_orders(
         self,
         status: str = "ACCEPT",
-        created_at_from: str | None = None,
-        created_at_to: str | None = None,
+        created_at_from: Optional[str] = None,
+        created_at_to: Optional[str] = None,
         page_size: int = 100,
     ) -> dict[str, Any]:
         """주문 목록 조회"""

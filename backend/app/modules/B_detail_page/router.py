@@ -17,8 +17,8 @@ router = APIRouter(prefix="/api/detail-page", tags=["B. 상세페이지 생성"]
 
 
 class GenerateRequest(BaseModel):
-    product_id: int | None = None   # DB 상품 ID
-    product_data: dict | None = None  # 또는 직접 상품 데이터 전달
+    product_id: Optional[int] = None   # DB 상품 ID
+    product_data: Optional[dict] = None  # 또는 직접 상품 데이터 전달
 
 
 @router.post("/generate")
