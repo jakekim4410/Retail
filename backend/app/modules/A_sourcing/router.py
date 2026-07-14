@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.product import Product, ProductStatus
 from app.modules.A_sourcing.ownerclan import ownerclan_client
 from app.modules.A_sourcing.margin import calculator, MarginCalculator
+from app.modules.A_sourcing.trend_analyzer import trend_analyzer
 from app.config import get_settings
 
 settings = get_settings()
@@ -213,6 +214,114 @@ async def scan_and_filter(
         "passed_products": passed_list,
         "filtered_products": filtered_list,
         "mock": raw.get("mock", False),
+    }
+
+
+@router.post("/trend-scan")
+async def trend_scan_and_filter(
+    category_name: str = Query("전체", description="트렌드를 조회할 카테고리명"),
+    page_size: int = Query(20, ge=1, le=50),
+    target_margin_pct: float = Query(settings.margin_threshold_percent),
+    monthly_sales_estimate: float = Query(500_000),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    트렌드 키워드 조회 -> 오너클랜 검색 -> 마진 검증 -> DB 저장
+    """
+    # 1. 트렌드 키워드 추출
+    keywords = await trend_analyzer.get_hot_keywords(category_name)
+    
+    if not keywords:
+        raise HTTPException(status_code=400, detail="트렌드 키워드를 추출하지 못했습니다.")
+
+    calc = MarginCalculator(
+        threshold_pct=target_margin_pct,
+        monthly_sales_estimate=monthly_sales_estimate,
+    )
+    
+    passed_list = []
+    filtered_list = []
+    total_scanned = 0
+    is_mock = False
+
+    # 2. 각 키워드별 검색 및 마진 검증
+    for keyword in keywords:
+        raw = await ownerclan_client.get_new_products(
+            page=1, page_size=page_size, keyword=keyword
+        )
+        products = raw.get("products", [])
+        total_scanned += len(products)
+        is_mock = raw.get("mock", False)
+
+        for p in products:
+            # 중복 체크
+            if any(x["source_id"] == p["source_id"] for x in passed_list + filtered_list):
+                continue
+                
+            suggested_price = calc.suggest_sale_price(
+                p["wholesale_price"],
+                p["source_category_code"],
+                target_margin_pct,
+            )
+            result = calc.calculate(
+                source_id=p["source_id"],
+                name=p["name"],
+                wholesale_price=p["wholesale_price"],
+                sale_price=suggested_price,
+                source_category_code=p["source_category_code"],
+            )
+            margin_dict = result.to_dict()
+            margin_dict["suggested_price"] = suggested_price
+
+            existing = await db.execute(
+                select(Product).where(Product.source_id == p["source_id"])
+            )
+            existing_product = existing.scalar_one_or_none()
+
+            if existing_product is None:
+                db_product = Product(
+                    source_id=p["source_id"],
+                    source_name="ownerclan",
+                    name=p["name"],
+                    brand=p.get("brand"),
+                    manufacturer=p.get("manufacturer"),
+                    origin=p.get("origin"),
+                    wholesale_price=p["wholesale_price"],
+                    sale_price=suggested_price,
+                    source_category_code=p["source_category_code"],
+                    image_urls=p.get("image_urls", []),
+                    specs=p.get("specs"),
+                    options=p.get("options"),
+                    margin_rate=result.net_margin_rate,
+                    margin_amount=result.net_margin,
+                    commission_rate=result.commission_rate,
+                    status=ProductStatus.SOURCED if result.passed else ProductStatus.FILTERED,
+                )
+                db.add(db_product)
+            else:
+                existing_product.margin_rate = result.net_margin_rate
+                existing_product.margin_amount = result.net_margin
+                existing_product.status = (
+                    ProductStatus.SOURCED if result.passed else ProductStatus.FILTERED
+                )
+
+            p_with_keyword = {**p, "trend_keyword": keyword}
+            
+            if result.passed:
+                passed_list.append({**p_with_keyword, "margin": margin_dict, "sourcing_grade": _grade_product(result.net_margin_rate, p.get("stock", 0))})
+            else:
+                filtered_list.append({**p_with_keyword, "margin": margin_dict, "filter_reason": "마진율 기준 미달"})
+
+    await db.commit()
+
+    return {
+        "keywords": keywords,
+        "total_scanned": total_scanned,
+        "passed": len(passed_list),
+        "filtered": len(filtered_list),
+        "passed_products": passed_list,
+        "filtered_products": filtered_list,
+        "mock": is_mock,
     }
 
 

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # Slack
     slack_webhook_url: str = Field(default="", alias="SLACK_WEBHOOK_URL")
 
+    # Naver DataLab API
+    naver_client_id: str = Field(default="", alias="NAVER_CLIENT_ID")
+    naver_client_secret: str = Field(default="", alias="NAVER_CLIENT_SECRET")
+
     # DB
     database_url: str = Field(
         default="sqlite+aiosqlite:///./sales_automation.db",

@@ -27,6 +27,7 @@ export default function Products() {
   const [message, setMessage] = useState(null)
   const [genBatchLoading, setGenBatchLoading] = useState(false)
   const [optimizerLoading, setOptimizerLoading] = useState(false)
+  const [editingHtmlTarget, setEditingHtmlTarget] = useState(null)
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -80,6 +81,36 @@ export default function Products() {
     loadProducts()
   }
 
+  async function openHtmlEditor(product) {
+    try {
+      const r = await fetch(`/api/detail-page/preview/${product.id}`)
+      if (!r.ok) throw new Error('상세페이지를 불러오지 못했습니다.')
+      const html = await r.text()
+      setEditingHtmlTarget({ ...product, html })
+    } catch (e) {
+      setMessage({ type: 'danger', text: `❌ ${e.message}` })
+    }
+  }
+
+  async function saveHtmlEdit() {
+    try {
+      const r = await fetch(`/api/detail-page/${editingHtmlTarget.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: editingHtmlTarget.html })
+      })
+      if (r.ok) {
+        setMessage({ type: 'success', text: '✅ HTML 수정이 저장되었습니다.' })
+        setEditingHtmlTarget(null)
+      } else {
+        const data = await r.json()
+        setMessage({ type: 'danger', text: `❌ 오류: ${data.detail || '저장 실패'}` })
+      }
+    } catch (e) {
+      setMessage({ type: 'danger', text: `❌ ${e.message}` })
+    }
+  }
+
   const statusCounts = products.reduce((acc, p) => {
     acc[p.status] = (acc[p.status] || 0) + 1
     return acc
@@ -94,6 +125,23 @@ export default function Products() {
         <p className="page-subtitle">상세페이지 생성 → 검수 → 쿠팡 등록 반자동 흐름</p>
       </div>
       <div className="page-body">
+
+        {editingHtmlTarget && (
+          <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.6)', zIndex:999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+            <div className="card" style={{width:'90%', maxWidth:1000, padding:24, display:'flex', flexDirection:'column', gap:16, maxHeight:'90vh'}}>
+              <h2 style={{margin:0, fontSize:20}}>📝 [{editingHtmlTarget.name}] HTML 수정</h2>
+              <textarea
+                style={{flex:1, width:'100%', minHeight:400, fontFamily:'monospace', padding:12, borderRadius:8, border:'1px solid var(--border-color)', background:'var(--bg-base)', color:'var(--text-primary)', resize:'none'}}
+                value={editingHtmlTarget.html}
+                onChange={e => setEditingHtmlTarget({...editingHtmlTarget, html: e.target.value})}
+              />
+              <div style={{display:'flex', justifyContent:'flex-end', gap:8}}>
+                <button className="btn btn-secondary" onClick={() => setEditingHtmlTarget(null)}>취소</button>
+                <button className="btn btn-primary" onClick={saveHtmlEdit}>저장</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {message && (
           <div className={`alert alert-${message.type}`} style={{ marginBottom: 16 }}>
@@ -178,7 +226,7 @@ export default function Products() {
                         }
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {step && (
                             <button
                               className="btn btn-success btn-sm"
@@ -188,7 +236,26 @@ export default function Products() {
                               {isLoading ? <div className="spinner" style={{ width: 12, height: 12 }} /> : step.action}
                             </button>
                           )}
-                          {p.status === 'on_sale' && (
+                          {p.status === 'page_generated' && (
+                            <>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => openHtmlEditor(p)}
+                                disabled={isLoading}
+                              >
+                                HTML 편집
+                              </button>
+                              <button
+                                className="btn btn-sm"
+                                onClick={() => doAction(p, { action: '수동 등록', api: (id) => fetch(`/api/registration/manual-register/${id}`, { method: 'POST' }) })}
+                                disabled={isLoading}
+                                style={{ backgroundColor: 'var(--accent-warning)', color: '#fff', border: 'none' }}
+                              >
+                                수동 등록
+                              </button>
+                            </>
+                          )}
+                          {(p.status === 'on_sale' || p.status === 'page_generated' || p.status === 'registered') && (
                             <a href={`/api/detail-page/preview/${p.id}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
                               미리보기
                             </a>

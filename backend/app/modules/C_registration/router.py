@@ -94,6 +94,31 @@ async def approve_and_register(
         raise HTTPException(status_code=502, detail=f"쿠팡 API 오류: {api_result}")
 
 
+@router.post("/manual-register/{product_id}")
+async def manual_register(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    수동 등록 완료 처리
+    쿠팡 API를 통하지 않고 수동으로 쿠팡 Wing에 등록을 완료한 경우 상태를 업데이트
+    """
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다")
+
+    # 수동 등록 시 coupang_product_id는 임시로 할당하거나 None 처리 (나중에 연동 가능)
+    product.status = ProductStatus.REGISTERED
+    await db.commit()
+    return {
+        "success": True,
+        "product_id": product_id,
+        "status": "registered",
+        "message": "수동 등록 완료 상태로 변경되었습니다."
+    }
+
+
 @router.post("/set-on-sale/{product_id}")
 async def set_on_sale(
     product_id: int,

@@ -189,9 +189,17 @@ function ProductCard({ product, targetMargin, onSimulate }) {
         <div style={{ fontSize: 11, color: 'var(--accent-secondary)', fontWeight: 600 }}>
           {product.source_category_name || product.source_category_code}
         </div>
-        <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <a 
+          href={`https://ownerclan.com/V2/product/view.php?code=${product.source_id}`} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', color: 'var(--text-primary)', textDecoration: 'none' }}
+          onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+          onMouseLeave={e => e.target.style.textDecoration = 'none'}
+        >
           {product.name}
-        </div>
+        </a>
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{product.brand}</div>
 
         <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -529,7 +537,16 @@ function ScanTab({ targetMargin }) {
                     <>
                       <tr key={p.source_id}>
                         <td>
-                          <div style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <a 
+                            href={`https://ownerclan.com/V2/product/view.php?code=${p.source_id}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', textDecoration: 'none', display: 'block' }}
+                            onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.target.style.textDecoration = 'none'}
+                          >
+                            {p.name}
+                          </a>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.brand}</div>
                         </td>
                         <td><span style={{ fontSize: 11, color: 'var(--accent-secondary)' }}>{p.source_category_name || p.source_category_code}</span></td>
@@ -612,6 +629,236 @@ function ScanTab({ targetMargin }) {
   )
 }
 
+// ─── 트렌드 스캔 탭 ─────────────────────────────────────────────────────────
+function TrendScanTab({ targetMargin }) {
+  const [scanResult, setScanResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState('passed')
+  const [expandedId, setExpandedId] = useState(null)
+  const [simulatorProduct, setSimulatorProduct] = useState(null)
+  const [categoryName, setCategoryName] = useState('전체')
+
+  const products = scanResult
+    ? (tab === 'passed' ? scanResult.passed_products : scanResult.filtered_products)
+    : []
+
+  async function runTrendScan() {
+    setLoading(true)
+    setScanResult(null)
+    try {
+      const resp = await fetch(
+        `/api/sourcing/trend-scan?target_margin_pct=${targetMargin}&monthly_sales_estimate=500000&page_size=20&category_name=${encodeURIComponent(categoryName)}`,
+        { method: 'POST' }
+      )
+      const text = await resp.text()
+      let data
+      try { data = JSON.parse(text) } catch { throw new Error(resp.ok ? 'Invalid JSON' : (text || `HTTP ${resp.status}`)) }
+      if (!resp.ok) throw new Error(data.detail || data.message || '스캔 서버 오류')
+      setScanResult(data)
+    } catch (e) {
+      alert('트렌드 스캔 오류: ' + e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div style={{
+        display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap',
+        padding: '20px', background: 'var(--bg-elevated)', borderRadius: 12, marginBottom: 20,
+        border: '1px solid var(--border-default)'
+      }}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>관심 카테고리 (키워드 추출용)</div>
+          <input 
+            type="text" 
+            value={categoryName} 
+            onChange={e => setCategoryName(e.target.value)}
+            style={{ padding: '8px 14px', background: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 14, width: 150 }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>트렌드 스캔 방식</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            시즌 및 트렌드 기반으로 유입량이 높은 키워드를 자동 추출하여 오너클랜에서 유망 상품을 찾습니다 (데이터랩/AI 연동).
+          </div>
+        </div>
+        <button
+          onClick={runTrendScan} disabled={loading}
+          style={{
+            padding: '10px 28px', borderRadius: 10, border: 'none',
+            background: loading ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #10b981, #059669)',
+            color: loading ? 'var(--text-muted)' : '#fff',
+            fontWeight: 700, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.2s',
+            boxShadow: loading ? 'none' : '0 4px 20px rgba(16,185,129,0.4)'
+          }}
+        >
+          {loading ? (
+            <><div style={{ width: 16, height: 16, border: '2px solid var(--text-muted)', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />분석 중...</>
+          ) : <>📈 트렌드 소싱 실행</>}
+        </button>
+      </div>
+
+      {scanResult && (
+        <>
+          <div style={{ padding: '16px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>✨ 추출된 실시간 트렌드 키워드</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {scanResult.keywords?.map(kw => (
+                <span key={kw} style={{ padding: '6px 12px', background: '#fff', borderRadius: 20, fontSize: 13, fontWeight: 700, color: '#059669', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                  #{kw}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: '전체 검색', val: scanResult.total_scanned, unit: '건', color: 'var(--text-primary)', icon: '📊' },
+              { label: '마진 통과', val: scanResult.passed, unit: '건', color: '#34d399', icon: '✅' },
+              { label: '마진 미달', val: scanResult.filtered, unit: '건', color: '#f87171', icon: '❌' },
+            ].map(({ label, val, unit, color, icon }) => (
+              <div key={label} style={{ background: 'var(--bg-card)', borderRadius: 10, padding: '16px 20px', border: '1px solid var(--border-default)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{icon} {label}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color }}>{val}<span style={{ fontSize: 13, marginLeft: 4 }}>{unit}</span></div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+            {[
+              { key: 'passed', label: `✅ 마진 통과 (${scanResult.passed})` },
+              { key: 'filtered', label: `❌ 마진 미달 (${scanResult.filtered})` },
+            ].map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                style={{
+                  padding: '8px 18px', borderRadius: 8, border: '1px solid',
+                  borderColor: tab === t.key ? 'var(--accent-primary)' : 'var(--border-default)',
+                  background: tab === t.key ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: tab === t.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.2s'
+                }}>{t.label}</button>
+            ))}
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>상품명 / 키워드</th>
+                  <th>카테고리</th>
+                  <th>도매가</th>
+                  <th>권장 판매가</th>
+                  <th>순마진율</th>
+                  <th>건당 순이익</th>
+                  <th>등급</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => {
+                  const m = p.margin
+                  const rate = m?.net_margin_rate_pct ?? 0
+                  const { g, color } = gradeLabel(rate)
+                  const isExp = expandedId === p.source_id
+                  return (
+                    <>
+                      <tr key={p.source_id}>
+                        <td>
+                          <a 
+                            href={`https://ownerclan.com/V2/product/view.php?code=${p.source_id}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', textDecoration: 'none', display: 'block' }}
+                            onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.target.style.textDecoration = 'none'}
+                          >
+                            {p.name}
+                          </a>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>검색어: <span style={{ color: '#10b981', fontWeight: 600 }}>{p.trend_keyword}</span></div>
+                        </td>
+                        <td><span style={{ fontSize: 11, color: 'var(--accent-secondary)' }}>{p.source_category_name || p.source_category_code}</span></td>
+                        <td>{p.wholesale_price?.toLocaleString()}원</td>
+                        <td><strong style={{ color: 'var(--accent-primary)' }}>{m?.suggested_price?.toLocaleString()}원</strong></td>
+                        <td><span style={{ color, fontWeight: 700 }}>{rate}%</span></td>
+                        <td style={{ fontWeight: 600 }}>{m?.net_margin?.toLocaleString()}원</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px', borderRadius: 12,
+                            background: `${color}20`, color, fontWeight: 700, fontSize: 13
+                          }}>{g}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setSimulatorProduct(p)}>시뮬레이터</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setExpandedId(isExp ? null : p.source_id)}>
+                              {isExp ? '닫기' : '상세'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExp && (
+                        <tr key={`${p.source_id}-d`}>
+                          <td colSpan={8} style={{ padding: '8px 16px 16px', background: 'rgba(99,102,241,0.03)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>마진 상세 분석</div>
+                                {m && [
+                                  ['판매가', m.sale_price, false],
+                                  ['도매가', m.wholesale_price, true],
+                                  [`쿠팡수수료 (${m.commission_rate_pct}%)`, m.commission_amount, true],
+                                  ['부가세', m.vat_amount, true],
+                                  ['반품비(예상)', m.estimated_return_cost, true],
+                                ].map(([l, v, minus]) => (
+                                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>{l}</span>
+                                    <span style={{ color: minus ? '#f87171' : 'var(--text-primary)' }}>{minus ? '-' : ''}{v?.toLocaleString()}원</span>
+                                  </div>
+                                ))}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0', fontWeight: 700 }}>
+                                  <span>순이익</span>
+                                  <span style={{ color: (m?.net_margin ?? 0) >= 0 ? '#34d399' : '#f87171' }}>
+                                    {(m?.net_margin ?? 0) >= 0 ? '+' : ''}{m?.net_margin?.toLocaleString()}원
+                                  </span>
+                                </div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>스펙 정보</div>
+                                {Object.entries(p.specs || {}).map(([k, v]) => (
+                                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>{k}</span>
+                                    <span>{v}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {!scanResult && !loading && (
+        <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📈</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>실시간 트렌드 기반 소싱 대기 중</div>
+          <div style={{ fontSize: 13 }}>네이버 데이터랩 및 AI가 분석한 검색 유입량이 가장 높은 키워드의 유망 상품을 찾아냅니다</div>
+        </div>
+      )}
+
+      {simulatorProduct && <MarginSimulator product={simulatorProduct} onClose={() => setSimulatorProduct(null)} />}
+    </div>
+  )
+}
+
 // ─── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export default function Sourcing() {
   const [activeTab, setActiveTab] = useState('browse')
@@ -668,6 +915,7 @@ export default function Sourcing() {
           {[
             { key: 'browse', label: '📂 카테고리 탐색 소싱', desc: '카테고리별 상품 브라우징' },
             { key: 'scan', label: '🤖 자동 스캔', desc: '마진 기준 일괄 분류' },
+            { key: 'trend', label: '📈 실시간 트렌드 소싱', desc: '유입량 기반 유망 상품 발굴' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               style={{
@@ -685,6 +933,7 @@ export default function Sourcing() {
         {/* 탭 컨텐츠 */}
         {activeTab === 'browse' && <BrowseTab targetMargin={targetMargin} />}
         {activeTab === 'scan' && <ScanTab targetMargin={targetMargin} />}
+        {activeTab === 'trend' && <TrendScanTab targetMargin={targetMargin} />}
 
       </div>
 

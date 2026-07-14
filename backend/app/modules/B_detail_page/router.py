@@ -85,6 +85,28 @@ async def preview_page(
     return HTMLResponse(content=product.detail_page_html)
 
 
+class UpdateHtmlRequest(BaseModel):
+    html: str
+
+
+@router.put("/{product_id}")
+async def update_detail_page(
+    product_id: int,
+    req: UpdateHtmlRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """생성된 상세페이지 HTML 원문 수정"""
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다")
+    
+    product.detail_page_html = req.html
+    await db.commit()
+    
+    return {"success": True, "product_id": product_id}
+
+
 @router.post("/generate-batch")
 async def generate_batch(
     db: AsyncSession = Depends(get_db),

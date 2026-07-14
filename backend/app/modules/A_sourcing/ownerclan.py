@@ -397,23 +397,26 @@ class OwnerClanClient:
         page: int = 1,
         page_size: int = 50,
         category_code: Optional[str] = None,
+        keyword: Optional[str] = None,
     ) -> dict[str, Any]:
         """신상품 목록 조회 - GraphQL allItems"""
         if self.mock_mode:
-            return self._mock_products(page, page_size, category_code)
+            return self._mock_products(page, page_size, category_code, keyword)
 
         # 실제 API 호출 — 실패 시 Mock fallback
         try:
-            return await self._real_get_new_products(page, page_size, category_code)
+            return await self._real_get_new_products(page, page_size, category_code, keyword)
         except Exception as e:
             logger.warning(f"[오너클랜] 실제 API 호출 실패, Mock fallback 사용: {e}")
-            return self._mock_products(page, page_size, category_code)
+            return self._mock_products(page, page_size, category_code, keyword)
 
-    def _mock_products(self, page: int, page_size: int, category_code: Optional[str]) -> dict[str, Any]:
+    def _mock_products(self, page: int, page_size: int, category_code: Optional[str], keyword: Optional[str] = None) -> dict[str, Any]:
         """Mock 상품 목록 반환"""
         products = MOCK_PRODUCTS
         if category_code:
             products = [p for p in products if p["source_category_code"] == category_code]
+        if keyword:
+            products = [p for p in products if keyword.lower() in p["name"].lower() or keyword.lower() in p.get("specs", {}).values()]
         start = (page - 1) * page_size
         end = start + page_size
         return {
@@ -429,14 +432,15 @@ class OwnerClanClient:
         page: int = 1,
         page_size: int = 50,
         category_code: Optional[str] = None,
+        keyword: Optional[str] = None,
     ) -> dict[str, Any]:
         """실제 오너클랜 GraphQL API 호출"""
 
         # GraphQL cursor-based pagination
         first = page_size
         query = """
-        query GetItems($first: Int, $after: String, $category: String) {
-          allItems(first: $first, after: $after, category: $category) {
+        query GetItems($first: Int, $after: String, $category: String, $keyword: String) {
+          allItems(first: $first, after: $after, category: $category, query: $keyword) {
             edges {
               node {
                 key
@@ -468,6 +472,8 @@ class OwnerClanClient:
         variables: dict[str, Any] = {"first": first}
         if category_code:
             variables["category"] = category_code
+        if keyword:
+            variables["keyword"] = keyword
             
         data = await self._graphql(query, variables)
 
