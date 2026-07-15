@@ -1,5 +1,6 @@
 """
 앱 설정 — 환경변수 로드 (pydantic-settings)
+실제 데이터 전용 — Mock 모드 없음
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -36,7 +37,6 @@ class Settings(BaseSettings):
     )
 
     # 시스템
-    mock_mode: bool = Field(default=True, alias="MOCK_MODE")
     margin_threshold_percent: float = Field(default=10.0, alias="MARGIN_THRESHOLD_PERCENT")
     poor_sales_days: int = Field(default=14, alias="POOR_SALES_DAYS")
     port: int = Field(default=8000, alias="PORT")

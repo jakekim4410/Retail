@@ -103,7 +103,6 @@ async def collect_orders(db: AsyncSession, days_back: int = 1) -> dict[str, Any]
         "total_in_source": len(orders_data),
         "new_orders": new_count,
         "updated_orders": updated_count,
-        "mock": raw.get("mock", False),
     }
 
 

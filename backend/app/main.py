@@ -27,8 +27,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 시작
-    logger.info("🚀 위탁판매 자동화 시스템 시작")
-    logger.info(f"   Mock 모드: {settings.mock_mode}")
+    logger.info("🚀 위탁판매 자동화 시스템 시작 (실제 데이터 모드)")
     logger.info(f"   마진율 기준: {settings.margin_threshold_percent}%")
     await init_db()
     scheduler = setup_scheduler()
@@ -94,7 +93,7 @@ async def root():
     return {
         "service": "위탁판매 통합 자동화 시스템",
         "version": "2.0.0",
-        "mock_mode": settings.mock_mode,
+        "mode": "live",
         "modules": ["A.소싱", "B.상세페이지", "C.등록", "D.모니터링", "E.최적화"],
         "docs": "/docs",
     }
@@ -109,7 +108,7 @@ async def health():
 async def settings_status():
     """API 키 연동 현황 조회 (값 노출 없이 설정 여부만 반환)"""
     return {
-        "mock_mode": settings.mock_mode,
+        "mode": "live",
         "ownerclan": {
             "configured": bool(settings.ownerclan_username and settings.ownerclan_password),
         },
@@ -123,6 +122,9 @@ async def settings_status():
         },
         "slack": {
             "configured": bool(settings.slack_webhook_url),
+        },
+        "naver": {
+            "configured": bool(settings.naver_client_id and settings.naver_client_secret),
         },
         "policy": {
             "margin_threshold_percent": settings.margin_threshold_percent,

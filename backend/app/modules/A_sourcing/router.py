@@ -94,7 +94,6 @@ async def browse_products(
         "page_size": page_size,
         "category_code": category_code,
         "products": result_list,
-        "mock": raw.get("mock", False),
     }
 
 
@@ -213,7 +212,6 @@ async def scan_and_filter(
         "filtered": len(filtered_list),
         "passed_products": passed_list,
         "filtered_products": filtered_list,
-        "mock": raw.get("mock", False),
     }
 
 
@@ -242,7 +240,6 @@ async def trend_scan_and_filter(
     passed_list = []
     filtered_list = []
     total_scanned = 0
-    is_mock = False
 
     # 2. 각 키워드별 검색 및 마진 검증
     for keyword in keywords:
@@ -251,7 +248,6 @@ async def trend_scan_and_filter(
         )
         products = raw.get("products", [])
         total_scanned += len(products)
-        is_mock = raw.get("mock", False)
 
         for p in products:
             # 중복 체크
@@ -321,7 +317,6 @@ async def trend_scan_and_filter(
         "filtered": len(filtered_list),
         "passed_products": passed_list,
         "filtered_products": filtered_list,
-        "mock": is_mock,
     }
 
 

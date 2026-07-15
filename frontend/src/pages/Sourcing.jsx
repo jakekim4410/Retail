@@ -248,7 +248,6 @@ function BrowseTab({ targetMargin }) {
   const [maxWholesale, setMaxWholesale] = useState('')
   const [minMargin, setMinMargin] = useState('')
   const [total, setTotal] = useState(0)
-  const [isMock, setIsMock] = useState(false)
 
   // 카테고리 로드
   useEffect(() => {
@@ -273,7 +272,6 @@ function BrowseTab({ targetMargin }) {
       const data = await resp.json()
       setProducts(data.products || [])
       setTotal(data.total || 0)
-      setIsMock(data.mock || false)
     } catch (e) {
       alert('상품 조회 오류: ' + e.message)
     } finally {
@@ -361,11 +359,6 @@ function BrowseTab({ targetMargin }) {
           <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             총 <strong style={{ color: 'var(--text-primary)' }}>{total}개</strong> 상품 (마진율 높은 순)
           </div>
-          {isMock && (
-            <div style={{ padding: '3px 10px', background: 'rgba(251,191,36,0.15)', color: '#fbbf24', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-              ⚡ Mock 데이터
-            </div>
-          )}
         </div>
       )}
 
@@ -489,11 +482,6 @@ function ScanTab({ targetMargin }) {
             ))}
           </div>
 
-          {scanResult.mock && (
-            <div style={{ padding: '8px 16px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 8, color: '#fbbf24', fontSize: 13, marginBottom: 16 }}>
-              ⚡ Mock 데이터로 실행됨 — 실제 오너클랜 API 연결 시 실상품 데이터로 교체됩니다
-            </div>
-          )}
 
           {/* 결과 탭 */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>

@@ -64,14 +64,12 @@ export default function Settings() {
           {status && (
             <div style={{
               marginTop: 16, padding: '8px 12px',
-              background: status.mock_mode ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)',
-              border: `1px solid ${status.mock_mode ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
+              background: 'rgba(34,197,94,0.1)',
+              border: '1px solid rgba(34,197,94,0.3)',
               borderRadius: 8, fontSize: 12,
-              color: status.mock_mode ? '#f59e0b' : '#22c55e'
+              color: '#22c55e'
             }}>
-              {status.mock_mode
-                ? '⚠️ 현재 Mock 모드로 실행 중입니다. 실제 API 키를 설정한 후 Render에서 MOCK_MODE=false 로 변경하세요.'
-                : '✅ 실제 API 모드로 실행 중입니다.'}
+              ✅ 실제 API 모드로 실행 중입니다. (로친 전용)
             </div>
           )}
         </div>
@@ -94,7 +92,8 @@ export default function Settings() {
                 { label: '쿠팡 Secret Key', key: 'COUPANG_SECRET_KEY', example: 'coupang에서 발급받은 시크릿' },
                 { label: 'Gemini API Key', key: 'GEMINI_API_KEY', example: 'AIzaSy...' },
                 { label: 'Slack Webhook URL', key: 'SLACK_WEBHOOK_URL', example: 'https://hooks.slack.com/...' },
-                { label: 'Mock 모드 해제', key: 'MOCK_MODE', example: 'false (실제 운영 시)' },
+                { label: '네이버 데이터랩 Client ID', key: 'NAVER_CLIENT_ID', example: '네이버 개발자센터 발급' },
+                { label: '네이버 데이터랩 Secret', key: 'NAVER_CLIENT_SECRET', example: '네이버 개발자센터 발급' },
               ].map(({ label, key, example }) => (
                 <div key={key} style={{ padding: '10px 12px', background: 'var(--surface-secondary)', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, marginBottom: 4 }}>{label}</div>

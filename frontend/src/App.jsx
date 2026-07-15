@@ -65,8 +65,10 @@ function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <div className="mock-badge">⚡ Mock 모드</div>
-        <div>API 키 없이 전체 기능 테스트 가능</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#22c55e' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 6px #22c55e' }}></span>
+          라이브 모드 (실제 데이터)
+        </div>
       </div>
     </aside>
   )
