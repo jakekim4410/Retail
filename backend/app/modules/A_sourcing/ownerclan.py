@@ -440,7 +440,7 @@ class OwnerClanClient:
         first = page_size
         query = """
         query GetItems($first: Int, $after: String, $category: String, $keyword: String) {
-          allItems(first: $first, after: $after, category: $category, query: $keyword) {
+          allItems(first: $first, after: $after, category: $category, search: $keyword) {
             edges {
               node {
                 key
